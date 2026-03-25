@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/francescodigiovanni/PycharmProjects/myagent/**)",
+      "Bash(pip install:*)",
+      "Bash(python3 -m pip install flask-cors)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(.venv/bin/pip show:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/francescodigiovanni/PyCharmProjects/myagent",
+      "/Users/francescodigiovanni/PycharmProjects/myagent"
+    ]
+  }
+}

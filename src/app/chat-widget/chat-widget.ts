@@ -2,11 +2,26 @@ import { Component, signal, ViewChild, ElementRef, OnInit, Inject } from '@angul
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DOCUMENT } from '@angular/common';
 
+export type StepStatus = 'active' | 'done';
+
+export interface AgentStep {
+  name: string;
+  status: StepStatus;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   timestamp: Date;
+  steps?: AgentStep[];
 }
+
+const STEP_LABELS: Record<string, string> = {
+  init: 'Avvio',
+  input_guard: 'Sicurezza',
+  reasoner: 'Analisi',
+  output_guard: 'Controllo',
+};
 
 @Component({
   selector: 'app-chat-widget',
@@ -25,6 +40,7 @@ export class ChatWidget implements OnInit {
 
   agentName = signal('MyAgent');
   avatarUrl = signal('');
+  apiUrl = signal('http://127.0.0.1:5000');
 
   constructor(@Inject(DOCUMENT) private doc: Document) {}
 
@@ -33,8 +49,10 @@ export class ChatWidget implements OnInit {
 
     const name   = params.get('name');
     const avatar = params.get('avatar');
+    const api    = params.get('api');
     if (name)   this.agentName.set(name);
     if (avatar) this.avatarUrl.set(avatar);
+    if (api)    this.apiUrl.set(api);
 
     window.addEventListener('message', (event) => {
       if (event.data?.source === 'myagent-fe-host' && event.data?.type === 'CLOSE_CHAT') {
@@ -44,7 +62,6 @@ export class ChatWidget implements OnInit {
         }
       }
     });
-
   }
 
   toggleChat(): void {
@@ -63,7 +80,7 @@ export class ChatWidget implements OnInit {
 
   sendMessage(): void {
     const text = this.inputText().trim();
-    if (!text) return;
+    if (!text || this.isTyping()) return;
 
     this.messages.update((msgs) => [
       ...msgs,
@@ -73,19 +90,89 @@ export class ChatWidget implements OnInit {
     this.scrollToBottom();
 
     this.isTyping.set(true);
-    // TODO: replace with real API call
-    setTimeout(() => {
-      this.isTyping.set(false);
+    this.streamAsk(text).catch(() => {
       this.messages.update((msgs) => [
         ...msgs,
-        {
-          role: 'assistant',
-          text: 'Ciao! Sono il tuo assistente AI. Come posso aiutarti?',
-          timestamp: new Date(),
-        },
+        { role: 'assistant', text: 'Errore di connessione. Riprova più tardi.', timestamp: new Date() },
       ]);
-      this.scrollToBottom();
-    }, 1000);
+    }).finally(() => {
+      this.isTyping.set(false);
+    });
+  }
+
+  private async streamAsk(question: string): Promise<void> {
+    const feUrl = this.doc.defaultView?.location.href ?? '';
+
+    const assistantMsg: ChatMessage = { role: 'assistant', text: '', timestamp: new Date(), steps: [] };
+    this.messages.update((msgs) => [...msgs, assistantMsg]);
+    this.isTyping.set(false);
+    this.scrollToBottom();
+
+    const response = await fetch(`${this.apiUrl()}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, fe_url: feUrl }),
+    });
+
+    if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let readingAnswer = false;
+
+    const updateLast = (fn: (msg: ChatMessage) => ChatMessage) => {
+      this.messages.update((msgs) => {
+        const last = msgs[msgs.length - 1];
+        if (!last || last.role !== 'assistant') return msgs;
+        return [...msgs.slice(0, -1), fn(last)];
+      });
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+
+        if (data.startsWith('next_step=')) {
+          const stepName = data.slice('next_step='.length);
+          readingAnswer = false;
+          updateLast((msg) => {
+            const steps = (msg.steps ?? []).map((s) =>
+              s.status === 'active' ? { ...s, status: 'done' as StepStatus } : s
+            );
+            if (stepName !== '__end__') steps.push({ name: stepName, status: 'active' });
+            return { ...msg, steps };
+          });
+        } else if (data.startsWith('answer=')) {
+          readingAnswer = true;
+          const inline = data.slice('answer='.length);
+          if (inline) updateLast((msg) => ({ ...msg, text: msg.text + inline }));
+        } else if (data.startsWith('log=')) {
+          readingAnswer = false;
+        } else if (readingAnswer && data) {
+          updateLast((msg) => ({ ...msg, text: msg.text + data }));
+        }
+
+        this.scrollToBottom();
+      }
+    }
+
+    updateLast((msg) => ({
+      ...msg,
+      steps: (msg.steps ?? []).map((s) => ({ ...s, status: 'done' as StepStatus })),
+    }));
+  }
+
+  getStepLabel(name: string): string {
+    return STEP_LABELS[name] ?? name;
   }
 
   onKeydown(event: KeyboardEvent): void {

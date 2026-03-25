@@ -78,7 +78,50 @@
             </div>
           }
           <div class="msg-body">
-            <div class="bubble">{{ msg.text }}</div>
+            @if (msg.steps && msg.steps.length > 0) {
+              <div class="steps-track">
+                @for (step of msg.steps; track step.name) {
+                  <div class="step-item" [class.active]="step.status === 'active'" [class.done]="step.status === 'done'">
+                    <div class="step-icon">
+                      @switch (step.name) {
+                        @case ('init') {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                            <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
+                          </svg>
+                        }
+                        @case ('input_guard') {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6l-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                          </svg>
+                        }
+                        @case ('reasoner') {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 21h6M12 3a6 6 0 0 1 6 6c0 2.2-1.2 4.1-3 5.2V17H9v-2.8A6 6 0 0 1 6 9a6 6 0 0 1 6-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        }
+                        @case ('output_guard') {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6l-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        }
+                        @default {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                            <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        }
+                      }
+                    </div>
+                    <span class="step-label">{{ getStepLabel(step.name) }}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (msg.text) {
+              <div class="bubble">{{ msg.text }}</div>
+            }
             <div class="timestamp">{{ msg.timestamp | date: 'HH:mm' }}</div>
           </div>
         </div>
