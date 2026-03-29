@@ -282,6 +282,23 @@
   line-height: 1.55;
   word-break: break-word;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  &.markdown {
+    ::ng-deep p {
+      margin: 0 0 6px;
+      &:last-child { margin-bottom: 0; }
+    }
+
+    ::ng-deep ul, ::ng-deep ol {
+      margin: 4px 0 6px;
+      padding-left: 18px;
+      &:last-child { margin-bottom: 0; }
+    }
+
+    ::ng-deep li { margin-bottom: 3px; }
+
+    ::ng-deep strong { font-weight: 600; }
+  }
 }
 
 .timestamp {

@@ -120,7 +120,11 @@
               </div>
             }
             @if (msg.text) {
-              <div class="bubble">{{ msg.text }}</div>
+              @if (msg.role === 'assistant') {
+                <div class="bubble markdown" [innerHTML]="parseMarkdown(msg.text)"></div>
+              } @else {
+                <div class="bubble">{{ msg.text }}</div>
+              }
             }
             <div class="timestamp">{{ msg.timestamp | date: 'HH:mm' }}</div>
           </div>
