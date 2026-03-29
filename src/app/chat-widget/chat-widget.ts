@@ -49,8 +49,10 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   avatarUrl = signal('');
   apiUrl = signal('http://127.0.0.1:5000');
 
-  private readonly STORAGE_KEY = 'myagent-messages';
-  private readonly UI_STATE_KEY = 'myagent-ui-state';
+  private readonly STORAGE_KEY    = 'myagent-messages';
+  private readonly UI_STATE_KEY   = 'myagent-ui-state';
+  private readonly THREAD_ID_KEY  = 'myagent-thread-id';
+  private threadId!: string;
   private cancelStream$ = new Subject<void>();
   private scrollTopSignal = signal(0);
 
@@ -89,6 +91,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
 
     this.loadMessages();
     this.loadUiState();
+    this.initThreadId();
 
     window.addEventListener('message', (event) => {
       if (event.data?.source === 'myagent-fe-host' && event.data?.type === 'CLOSE_CHAT') {
@@ -153,7 +156,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
 
     this.cancelStream$.next(); // cancella eventuale stream precedente
 
-    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl })
+    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl, thread_id: this.threadId })
       .pipe(
         observeOn(animationFrameScheduler), // un token per animation frame → render continuo
         takeUntil(this.cancelStream$),
@@ -252,6 +255,16 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
       // teardown: abortare la fetch se il subscriber si unssubscribe
       return () => controller.abort();
     });
+  }
+
+  private initThreadId(): void {
+    const stored = localStorage.getItem(this.THREAD_ID_KEY);
+    if (stored) {
+      this.threadId = stored;
+    } else {
+      this.threadId = crypto.randomUUID();
+      localStorage.setItem(this.THREAD_ID_KEY, this.threadId);
+    }
   }
 
   private loadUiState(): void {
