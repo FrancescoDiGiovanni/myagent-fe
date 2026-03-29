@@ -157,16 +157,16 @@
 
     <div class="input-area">
       <div class="input-wrapper">
-        <input
+        <textarea
           #inputField
-          type="text"
+          rows="1"
           [value]="inputText()"
-          (input)="inputText.set($any($event.target).value)"
+          (input)="inputText.set($any($event.target).value); autoResize()"
           (keydown)="onKeydown($event)"
           placeholder="Inserisci comando..."
           aria-label="Messaggio"
           autocomplete="off"
-        />
+        ></textarea>
         <div class="input-glow"></div>
       </div>
       <button class="send-btn" (click)="sendMessage()" [disabled]="!inputText().trim()" aria-label="Invia">

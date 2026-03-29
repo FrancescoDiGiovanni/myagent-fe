@@ -336,7 +336,7 @@
 .input-area {
   padding: 12px 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   border-top: 1px solid #e5e7eb;
   background: #fff;
@@ -345,17 +345,22 @@
 .input-wrapper { flex: 1; }
 .input-glow { display: none; }
 
-input {
+textarea {
   width: 100%;
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
-  border-radius: 24px;
+  border-radius: 12px;
   padding: 9px 16px;
   font-size: 13.5px;
   font-family: inherit;
   color: #111827;
   outline: none;
   transition: border-color 0.2s, background 0.2s;
+  resize: none;
+  overflow-y: hidden;
+  line-height: 1.5;
+  box-sizing: border-box;
+  display: block;
 
   &::placeholder { color: #9ca3af; }
 
@@ -363,6 +368,9 @@ input {
     border-color: #a5b4fc;
     background: #fff;
   }
+
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
 }
 
 // ─── Steps track ─────────────────────────────────────────────────────────────

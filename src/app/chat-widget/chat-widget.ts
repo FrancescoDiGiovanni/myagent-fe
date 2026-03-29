@@ -38,7 +38,7 @@ const STEP_LABELS: Record<string, string> = {
 })
 export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('messagesContainer') messagesContainer?: ElementRef<HTMLDivElement>;
-  @ViewChild('inputField') inputField?: ElementRef<HTMLInputElement>;
+  @ViewChild('inputField') inputField?: ElementRef<HTMLTextAreaElement>;
 
   isOpen = signal(false);
   messages = signal<ChatMessage[]>([]);
@@ -101,6 +101,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    if (this.inputText()) setTimeout(() => this.autoResize(), 0);
     if (this.isOpen() && this.scrollTopSignal() > 0) {
       setTimeout(() => {
         const el = this.messagesContainer?.nativeElement;
@@ -141,6 +142,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
       { role: 'user', text, timestamp: new Date() },
     ]);
     this.inputText.set('');
+    setTimeout(() => this.autoResize(), 0);
     this.isTyping.set(true);
     this.scrollToBottom();
 
@@ -288,6 +290,20 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
       if (!last || last.role !== 'assistant') return msgs;
       return [...msgs.slice(0, -1), fn(last)];
     });
+  }
+
+  autoResize(): void {
+    const el = this.inputField?.nativeElement;
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxHeight = 118; // ~5 lines
+    if (el.scrollHeight > maxHeight) {
+      el.style.height = maxHeight + 'px';
+      el.style.overflowY = 'auto';
+    } else {
+      el.style.height = el.scrollHeight + 'px';
+      el.style.overflowY = 'hidden';
+    }
   }
 
   onMessagesScroll(event: Event): void {
