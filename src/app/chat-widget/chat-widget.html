@@ -39,7 +39,7 @@
       </button>
     </div>
 
-    <div class="messages" #messagesContainer>
+    <div class="messages" #messagesContainer (scroll)="onMessagesScroll($event)">
       @if (messages().length === 0) {
         <div class="empty-state">
           <div class="empty-icon">

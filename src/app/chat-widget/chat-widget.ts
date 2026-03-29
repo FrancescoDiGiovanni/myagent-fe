@@ -1,4 +1,4 @@
-import { Component, signal, ViewChild, ElementRef, OnInit, OnDestroy, Inject } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, OnInit, AfterViewInit, OnDestroy, Inject, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DOCUMENT } from '@angular/common';
 import { Observable, Subject, takeUntil } from 'rxjs';
@@ -36,7 +36,7 @@ const STEP_LABELS: Record<string, string> = {
   templateUrl: './chat-widget.html',
   styleUrl: './chat-widget.scss',
 })
-export class ChatWidget implements OnInit, OnDestroy {
+export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('messagesContainer') messagesContainer?: ElementRef<HTMLDivElement>;
   @ViewChild('inputField') inputField?: ElementRef<HTMLInputElement>;
 
@@ -49,9 +49,33 @@ export class ChatWidget implements OnInit, OnDestroy {
   avatarUrl = signal('');
   apiUrl = signal('http://127.0.0.1:5000');
 
+  private readonly STORAGE_KEY = 'myagent-messages';
+  private readonly UI_STATE_KEY = 'myagent-ui-state';
   private cancelStream$ = new Subject<void>();
+  private scrollTopSignal = signal(0);
 
-  constructor(@Inject(DOCUMENT) private doc: Document) {}
+  constructor(@Inject(DOCUMENT) private doc: Document) {
+    effect(() => {
+      const msgs = this.messages();
+      if (msgs.length === 0) {
+        localStorage.removeItem(this.STORAGE_KEY);
+        return;
+      }
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(msgs));
+      } catch { /* quota exceeded */ }
+    });
+
+    effect(() => {
+      try {
+        localStorage.setItem(this.UI_STATE_KEY, JSON.stringify({
+          isOpen:    this.isOpen(),
+          inputText: this.inputText(),
+          scrollTop: this.scrollTopSignal(),
+        }));
+      } catch { /* quota exceeded */ }
+    });
+  }
 
   ngOnInit(): void {
     const params = new URLSearchParams(this.doc.defaultView?.location.search ?? '');
@@ -63,6 +87,9 @@ export class ChatWidget implements OnInit, OnDestroy {
     if (avatar) this.avatarUrl.set(avatar);
     if (api)    this.apiUrl.set(api);
 
+    this.loadMessages();
+    this.loadUiState();
+
     window.addEventListener('message', (event) => {
       if (event.data?.source === 'myagent-fe-host' && event.data?.type === 'CLOSE_CHAT') {
         if (this.isOpen()) {
@@ -71,6 +98,15 @@ export class ChatWidget implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  ngAfterViewInit(): void {
+    if (this.isOpen() && this.scrollTopSignal() > 0) {
+      setTimeout(() => {
+        const el = this.messagesContainer?.nativeElement;
+        if (el) el.scrollTop = this.scrollTopSignal();
+      }, 50);
+    }
   }
 
   ngOnDestroy(): void {
@@ -82,7 +118,11 @@ export class ChatWidget implements OnInit, OnDestroy {
     this.isOpen.update((v) => !v);
     this.notifyParent(this.isOpen() ? 'CHAT_OPENED' : 'CHAT_CLOSED');
     if (this.isOpen()) {
-      setTimeout(() => this.inputField?.nativeElement.focus(), 150);
+      setTimeout(() => {
+        this.inputField?.nativeElement.focus();
+        const el = this.messagesContainer?.nativeElement;
+        if (el) el.scrollTop = this.scrollTopSignal();
+      }, 150);
     }
   }
 
@@ -212,12 +252,46 @@ export class ChatWidget implements OnInit, OnDestroy {
     });
   }
 
+  private loadUiState(): void {
+    try {
+      const raw = localStorage.getItem(this.UI_STATE_KEY);
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      if (state.isOpen)    this.isOpen.set(true);
+      if (state.inputText) this.inputText.set(state.inputText);
+      if (state.scrollTop) this.scrollTopSignal.set(state.scrollTop);
+      if (state.isOpen)    this.notifyParent('CHAT_OPENED');
+    } catch { /* ignore */ }
+  }
+
+  private loadMessages(): void {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (!raw) return;
+      const parsed: ChatMessage[] = JSON.parse(raw);
+      const messages = parsed
+        .map(msg => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+          steps: msg.steps?.map(s => ({ ...s, status: 'done' as StepStatus })),
+        }))
+        .filter(msg => msg.role !== 'assistant' || msg.text.trim() !== '');
+      this.messages.set(messages);
+    } catch {
+      localStorage.removeItem(this.STORAGE_KEY);
+    }
+  }
+
   private updateLast(fn: (msg: ChatMessage) => ChatMessage): void {
     this.messages.update((msgs) => {
       const last = msgs[msgs.length - 1];
       if (!last || last.role !== 'assistant') return msgs;
       return [...msgs.slice(0, -1), fn(last)];
     });
+  }
+
+  onMessagesScroll(event: Event): void {
+    this.scrollTopSignal.set((event.target as HTMLDivElement).scrollTop);
   }
 
   getStepLabel(name: string): string {
