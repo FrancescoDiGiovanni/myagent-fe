@@ -1,6 +1,8 @@
-import { Component, signal, ViewChild, ElementRef, OnInit, Inject } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, OnInit, OnDestroy, Inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DOCUMENT } from '@angular/common';
+import { Observable, Subject, takeUntil } from 'rxjs';
+import { observeOn, animationFrameScheduler } from 'rxjs';
 
 export type StepStatus = 'active' | 'done';
 
@@ -16,6 +18,11 @@ export interface ChatMessage {
   steps?: AgentStep[];
 }
 
+type SseEvent =
+  | { kind: 'step'; name: string }
+  | { kind: 'token'; text: string }
+  | { kind: 'end' };
+
 const STEP_LABELS: Record<string, string> = {
   init: 'Avvio',
   input_guard: 'Sicurezza',
@@ -29,7 +36,7 @@ const STEP_LABELS: Record<string, string> = {
   templateUrl: './chat-widget.html',
   styleUrl: './chat-widget.scss',
 })
-export class ChatWidget implements OnInit {
+export class ChatWidget implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') messagesContainer?: ElementRef<HTMLDivElement>;
   @ViewChild('inputField') inputField?: ElementRef<HTMLInputElement>;
 
@@ -41,6 +48,8 @@ export class ChatWidget implements OnInit {
   agentName = signal('MyAgent');
   avatarUrl = signal('');
   apiUrl = signal('http://127.0.0.1:5000');
+
+  private cancelStream$ = new Subject<void>();
 
   constructor(@Inject(DOCUMENT) private doc: Document) {}
 
@@ -62,6 +71,11 @@ export class ChatWidget implements OnInit {
         }
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.cancelStream$.next();
+    this.cancelStream$.complete();
   }
 
   toggleChat(): void {
@@ -87,88 +101,123 @@ export class ChatWidget implements OnInit {
       { role: 'user', text, timestamp: new Date() },
     ]);
     this.inputText.set('');
-    this.scrollToBottom();
-
     this.isTyping.set(true);
-    this.streamAsk(text).catch(() => {
-      this.messages.update((msgs) => [
-        ...msgs,
-        { role: 'assistant', text: 'Errore di connessione. Riprova più tardi.', timestamp: new Date() },
-      ]);
-    }).finally(() => {
-      this.isTyping.set(false);
-    });
-  }
-
-  private async streamAsk(question: string): Promise<void> {
-    const feUrl = this.doc.referrer || this.doc.defaultView?.location.href || '';
+    this.scrollToBottom();
 
     const assistantMsg: ChatMessage = { role: 'assistant', text: '', timestamp: new Date(), steps: [] };
     this.messages.update((msgs) => [...msgs, assistantMsg]);
-    this.isTyping.set(false);
-    this.scrollToBottom();
 
-    const response = await fetch(`${this.apiUrl()}/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, fe_url: feUrl }),
-    });
+    const feUrl = this.doc.referrer || this.doc.defaultView?.location.href || '';
 
-    if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+    this.cancelStream$.next(); // cancella eventuale stream precedente
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let readingAnswer = false;
-
-    const updateLast = (fn: (msg: ChatMessage) => ChatMessage) => {
-      this.messages.update((msgs) => {
-        const last = msgs[msgs.length - 1];
-        if (!last || last.role !== 'assistant') return msgs;
-        return [...msgs.slice(0, -1), fn(last)];
+    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl })
+      .pipe(
+        observeOn(animationFrameScheduler), // un token per animation frame → render continuo
+        takeUntil(this.cancelStream$),
+      )
+      .subscribe({
+        next: (event) => {
+          if (event.kind === 'step') {
+            this.updateLast((msg) => {
+              const steps = (msg.steps ?? []).map((s) =>
+                s.status === 'active' ? { ...s, status: 'done' as StepStatus } : s
+              );
+              if (event.name !== '__end__') steps.push({ name: event.name, status: 'active' });
+              return { ...msg, steps };
+            });
+          } else if (event.kind === 'token') {
+            this.updateLast((msg) => ({ ...msg, text: msg.text + event.text }));
+            this.scrollToBottom();
+          } else if (event.kind === 'end') {
+            this.updateLast((msg) => ({
+              ...msg,
+              steps: (msg.steps ?? []).map((s) => ({ ...s, status: 'done' as StepStatus })),
+            }));
+          }
+        },
+        error: () => {
+          this.updateLast((msg) => ({
+            ...msg,
+            text: msg.text || 'Errore di connessione. Riprova più tardi.',
+          }));
+          this.isTyping.set(false);
+        },
+        complete: () => {
+          this.isTyping.set(false);
+        },
       });
-    };
+  }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+  private sseStream(url: string, body: object): Observable<SseEvent> {
+    return new Observable((observer) => {
+      const controller = new AbortController();
+      let readingAnswer = false;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok || !response.body) {
+            observer.error(new Error(`HTTP ${response.status}`));
+            return;
+          }
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-        if (data.startsWith('next_step=')) {
-          const stepName = data.slice('next_step='.length);
-          readingAnswer = false;
-          updateLast((msg) => {
-            const steps = (msg.steps ?? []).map((s) =>
-              s.status === 'active' ? { ...s, status: 'done' as StepStatus } : s
-            );
-            if (stepName !== '__end__') steps.push({ name: stepName, status: 'active' });
-            return { ...msg, steps };
-          });
-        } else if (data.startsWith('answer=')) {
-          readingAnswer = true;
-          const inline = data.slice('answer='.length);
-          if (inline) updateLast((msg) => ({ ...msg, text: msg.text + inline }));
-        } else if (data.startsWith('log=')) {
-          readingAnswer = false;
-        } else if (readingAnswer && data) {
-          updateLast((msg) => ({ ...msg, text: msg.text + data }));
-        }
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) { observer.complete(); break; }
 
-        this.scrollToBottom();
-      }
-    }
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() ?? '';
 
-    updateLast((msg) => ({
-      ...msg,
-      steps: (msg.steps ?? []).map((s) => ({ ...s, status: 'done' as StepStatus })),
-    }));
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).replace(/\r$/, '');
+
+                if (data.startsWith('next_step=')) {
+                  readingAnswer = false;
+                  observer.next({ kind: 'step', name: data.slice('next_step='.length) });
+                } else if (data.startsWith('answer=')) {
+                  readingAnswer = true;
+                  const inline = data.slice('answer='.length);
+                  if (inline) observer.next({ kind: 'token', text: inline });
+                } else if (data.startsWith('log=')) {
+                  readingAnswer = false;
+                  observer.next({ kind: 'end' });
+                } else if (readingAnswer && data) {
+                  observer.next({ kind: 'token', text: data });
+                }
+              }
+            }
+          } catch (err: any) {
+            if (err?.name !== 'AbortError') observer.error(err);
+            else observer.complete();
+          }
+        })
+        .catch((err) => {
+          if (err?.name !== 'AbortError') observer.error(err);
+        });
+
+      // teardown: abortare la fetch se il subscriber si unssubscribe
+      return () => controller.abort();
+    });
+  }
+
+  private updateLast(fn: (msg: ChatMessage) => ChatMessage): void {
+    this.messages.update((msgs) => {
+      const last = msgs[msgs.length - 1];
+      if (!last || last.role !== 'assistant') return msgs;
+      return [...msgs.slice(0, -1), fn(last)];
+    });
   }
 
   getStepLabel(name: string): string {
@@ -176,9 +225,7 @@ export class ChatWidget implements OnInit {
   }
 
   parseMarkdown(text: string): string {
-    // Normalize literal "\n" escape sequences sent as text by the backend
     let normalized = text.replace(/\\n/g, '\n');
-    // Insert newline before inline list markers not already at line start
     normalized = normalized.replace(/([^\n])(- |\d+\. )/g, '$1\n$2');
 
     const lines = normalized.split('\n');
@@ -202,7 +249,6 @@ export class ChatWidget implements OnInit {
         html += `<li>${this.inlineMarkdown(content)}</li>`;
       } else if (line.trim() === '') {
         if (!inList) html += '<br>';
-        // blank lines inside a list are skipped to avoid closing and reopening it
       } else {
         if (inList) { html += `</${listType}>`; inList = false; }
         html += `<p>${this.inlineMarkdown(line)}</p>`;
