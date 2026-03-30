@@ -157,7 +157,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
 
     this.cancelStream$.next(); // cancella eventuale stream precedente
 
-    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl, thread_id: this.threadId })
+    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl, thread_id: this.threadId, agent_name: this.agentName() })
       .pipe(
         observeOn(animationFrameScheduler), // un token per animation frame → render continuo
         takeUntil(this.cancelStream$),
