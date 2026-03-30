@@ -45,7 +45,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   inputText = signal('');
   isTyping = signal(false);
 
-  agentName = signal('MyAgent');
+  agentName = signal('Aria');
   avatarUrl = signal('');
   apiUrl = signal('http://127.0.0.1:5000');
 
