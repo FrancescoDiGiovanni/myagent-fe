@@ -418,11 +418,20 @@ textarea {
   transition: color 0.2s;
 
   &.done {
-    color: #6366f1;
+    color: #10b981;
 
     .step-icon {
-      background: rgba(99, 102, 241, 0.08);
-      border-color: rgba(99, 102, 241, 0.28);
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.28);
+    }
+  }
+
+  &.error {
+    color: #ef4444;
+
+    .step-icon {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.28);
     }
   }
 

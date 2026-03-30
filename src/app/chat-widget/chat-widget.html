@@ -85,10 +85,10 @@
             </div>
           }
           <div class="msg-body">
-            @if (msg.steps && msg.steps.length > 0) {
+            @if (msg.steps && msg.steps.length > 0 && !msg.hideSteps) {
               <div class="steps-track">
                 @for (step of msg.steps; track step.name) {
-                  <div class="step-item" [class.active]="step.status === 'active'" [class.done]="step.status === 'done'">
+                  <div class="step-item" [class.active]="step.status === 'active'" [class.done]="step.status === 'done'" [class.error]="step.status === 'error'">
                     <div class="step-icon">
                       @switch (step.name) {
                         @case ('init') {

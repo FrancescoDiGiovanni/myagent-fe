@@ -4,7 +4,7 @@ import { DatePipe, DOCUMENT } from '@angular/common';
 import { Observable, Subject, takeUntil } from 'rxjs';
 import { observeOn, animationFrameScheduler } from 'rxjs';
 
-export type StepStatus = 'active' | 'done';
+export type StepStatus = 'active' | 'done' | 'error';
 
 export interface AgentStep {
   name: string;
@@ -16,6 +16,7 @@ export interface ChatMessage {
   text: string;
   timestamp: Date;
   steps?: AgentStep[];
+  hideSteps?: boolean;
 }
 
 type SseEvent =
@@ -183,10 +184,14 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
           this.updateLast((msg) => ({
             ...msg,
             text: msg.text || 'Errore di connessione. Riprova più tardi.',
+            steps: (msg.steps ?? []).map((s) =>
+              s.status === 'active' ? { ...s, status: 'error' as StepStatus } : s
+            ),
           }));
           this.isTyping.set(false);
         },
         complete: () => {
+          this.updateLast((msg) => ({ ...msg, hideSteps: true }));
           this.isTyping.set(false);
         },
       });
