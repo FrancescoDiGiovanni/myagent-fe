@@ -137,7 +137,7 @@
           </div>
         </div>
       }
-      @if (isTyping()) {
+      @if (isTyping() && !messages().at(-1)?.text) {
         <div class="message assistant">
           <div class="msg-avatar">
             @if (avatarUrl()) {

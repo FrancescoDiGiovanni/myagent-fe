@@ -148,10 +148,10 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     this.inputText.set('');
     setTimeout(() => this.autoResize(), 0);
     this.isTyping.set(true);
-    this.scrollToBottom();
 
     const assistantMsg: ChatMessage = { role: 'assistant', text: '', timestamp: new Date(), steps: [] };
     this.messages.update((msgs) => [...msgs, assistantMsg]);
+    this.scrollToBottom();
 
     const feUrl = this.doc.referrer || this.doc.defaultView?.location.href || '';
 
@@ -172,6 +172,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
               if (event.name !== '__end__') steps.push({ name: event.name, status: 'active' });
               return { ...msg, steps };
             });
+            this.scrollToBottom();
           } else if (event.kind === 'token') {
             this.updateLast((msg) => ({ ...msg, text: msg.text + event.text }));
             this.scrollToBottom();
