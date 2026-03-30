@@ -287,6 +287,11 @@
   flex-shrink: 0;
   overflow: hidden;
 
+  &.user-avatar {
+    background: #9ca3af;
+    animation: none;
+  }
+
   .avatar-img {
     width: 100%;
     height: 100%;

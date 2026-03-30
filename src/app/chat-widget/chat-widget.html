@@ -84,6 +84,14 @@
               }
             </div>
           }
+          @if (msg.role === 'user') {
+            <div class="msg-avatar user-avatar">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="8" r="4" stroke="white" stroke-width="1.8"/>
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+          }
           <div class="msg-body">
             @if (msg.steps && msg.steps.length > 0 && !msg.hideSteps) {
               <div class="steps-track">
