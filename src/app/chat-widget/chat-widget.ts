@@ -389,6 +389,14 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  onMessagesWheel(event: WheelEvent): void {
+    const el = this.messagesContainer?.nativeElement;
+    if (!el) return;
+    const atTop = el.scrollTop === 0 && event.deltaY < 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight && event.deltaY > 0;
+    if (atTop || atBottom) event.preventDefault();
+  }
+
   private scrollToBottom(): void {
     setTimeout(() => {
       const el = this.messagesContainer?.nativeElement;
