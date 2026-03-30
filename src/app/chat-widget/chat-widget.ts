@@ -54,7 +54,6 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   private readonly THREAD_ID_KEY  = 'myagent-thread-id';
   private threadId!: string;
   private cancelStream$ = new Subject<void>();
-  private scrollTopSignal = signal(0);
 
   constructor(@Inject(DOCUMENT) private doc: Document) {
     effect(() => {
@@ -73,7 +72,6 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
         localStorage.setItem(this.UI_STATE_KEY, JSON.stringify({
           isOpen:    this.isOpen(),
           inputText: this.inputText(),
-          scrollTop: this.scrollTopSignal(),
         }));
       } catch { /* quota exceeded */ }
     });
@@ -106,11 +104,9 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     if (this.inputText()) setTimeout(() => this.autoResize(), 0);
-    if (this.isOpen() && this.scrollTopSignal() > 0) {
-      setTimeout(() => {
-        const el = this.messagesContainer?.nativeElement;
-        if (el) el.scrollTop = this.scrollTopSignal();
-      }, 50);
+    if (this.isOpen()) {
+      this.scrollToBottom();
+      setTimeout(() => this.scrollToBottom(), 200);
     }
   }
 
@@ -125,8 +121,8 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     if (this.isOpen()) {
       setTimeout(() => {
         this.inputField?.nativeElement.focus();
-        const el = this.messagesContainer?.nativeElement;
-        if (el) el.scrollTop = this.scrollTopSignal();
+        this.scrollToBottom();
+        setTimeout(() => this.scrollToBottom(), 200);
       }, 150);
     }
   }
@@ -294,7 +290,6 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
       const state = JSON.parse(raw);
       if (state.isOpen)    this.isOpen.set(true);
       if (state.inputText) this.inputText.set(state.inputText);
-      if (state.scrollTop) this.scrollTopSignal.set(state.scrollTop);
       if (state.isOpen)    this.notifyParent('CHAT_OPENED');
     } catch { /* ignore */ }
   }
@@ -339,9 +334,6 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  onMessagesScroll(event: Event): void {
-    this.scrollTopSignal.set((event.target as HTMLDivElement).scrollTop);
-  }
 
   getStepLabel(name: string): string {
     return STEP_LABELS[name] ?? name;
