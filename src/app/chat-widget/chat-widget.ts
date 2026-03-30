@@ -92,6 +92,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     this.loadMessages();
     this.loadUiState();
     this.initThreadId();
+    if (this.messages().length === 0) this.addWelcomeMessage();
 
     window.addEventListener('message', (event) => {
       if (event.data?.source === 'myagent-fe-host' && event.data?.type === 'CLOSE_CHAT') {
@@ -274,6 +275,15 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     this.threadId = crypto.randomUUID();
     localStorage.setItem(this.THREAD_ID_KEY, this.threadId);
     localStorage.removeItem(this.STORAGE_KEY);
+    this.addWelcomeMessage();
+  }
+
+  private addWelcomeMessage(): void {
+    this.messages.set([{
+      role: 'assistant',
+      text: `Ciao, sono ${this.agentName()}, sono un agente di supporto e sono qui per aiutarti per qualsiasi dubbio!`,
+      timestamp: new Date(),
+    }]);
   }
 
   private loadUiState(): void {
