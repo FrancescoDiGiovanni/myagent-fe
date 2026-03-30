@@ -25,7 +25,14 @@
           }
         </div>
         <div>
-          <div class="agent-name">{{ agentName() }}</div>
+          <div class="agent-name-row">
+            <span class="agent-name">{{ agentName() }}</span>
+            <button class="reset-btn" (click)="resetConversation()" aria-label="Nuova conversazione" title="Nuova conversazione">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M4 4v5h.582M20 20v-5h-.581M4.582 9a8 8 0 0 1 15.356 2M19.419 15a8 8 0 0 1-15.356-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
           <div class="agent-status">
             <span class="pulse-dot"></span>
             Sistema operativo

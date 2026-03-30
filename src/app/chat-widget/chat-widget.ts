@@ -267,6 +267,15 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  resetConversation(): void {
+    this.cancelStream$.next();
+    this.isTyping.set(false);
+    this.messages.set([]);
+    this.threadId = crypto.randomUUID();
+    localStorage.setItem(this.THREAD_ID_KEY, this.threadId);
+    localStorage.removeItem(this.STORAGE_KEY);
+  }
+
   private loadUiState(): void {
     try {
       const raw = localStorage.getItem(this.UI_STATE_KEY);
