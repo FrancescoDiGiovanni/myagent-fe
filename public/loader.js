@@ -28,6 +28,7 @@
 
   var baseUrl    = attr('data-url', (script && script.src.replace(/\/loader\.js.*$/, '')) || 'http://localhost:4200');
   var agentName  = attr('data-name',         'MyAgent');
+  var agentProfile = attr('data-profile',    'STANDARD');
   var agentAvatar = attr('data-avatar',      '');
   var colorFrom  = attr('data-color-from',   '#6366f1');
   var colorMid   = attr('data-color-mid',    '#8b5cf6');
@@ -36,6 +37,7 @@
   // ── Build iframe src with query params ───────────────────────────────────────
   var paramsObj = {
     name:      agentName,
+    profile:   agentProfile,
     colorFrom: colorFrom,
     colorMid:  colorMid,
     colorTo:   colorTo,

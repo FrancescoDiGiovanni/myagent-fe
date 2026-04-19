@@ -47,6 +47,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   isTyping = signal(false);
 
   agentName = signal('Aria');
+  agentProfile = signal('STANDARD');
   avatarUrl = signal('');
   apiUrl = signal('http://127.0.0.1:5000');
 
@@ -81,12 +82,14 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     const params = new URLSearchParams(this.doc.defaultView?.location.search ?? '');
 
-    const name   = params.get('name');
-    const avatar = params.get('avatar');
-    const api    = params.get('api');
-    if (name)   this.agentName.set(name);
-    if (avatar) this.avatarUrl.set(avatar);
-    if (api)    this.apiUrl.set(api);
+    const name    = params.get('name');
+    const profile = params.get('profile');
+    const avatar  = params.get('avatar');
+    const api     = params.get('api');
+    if (name)    this.agentName.set(name);
+    if (profile) this.agentProfile.set(profile);
+    if (avatar)  this.avatarUrl.set(avatar);
+    if (api)     this.apiUrl.set(api);
 
     this.loadMessages();
     this.loadUiState();
@@ -154,7 +157,7 @@ export class ChatWidget implements OnInit, AfterViewInit, OnDestroy {
 
     this.cancelStream$.next(); // cancella eventuale stream precedente
 
-    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl, thread_id: this.threadId, agent_name: this.agentName() })
+    this.sseStream(`${this.apiUrl()}/ask`, { question: text, fe_url: feUrl, thread_id: this.threadId, agent_name: this.agentName(), agent_profile: this.agentProfile() })
       .pipe(
         observeOn(animationFrameScheduler), // un token per animation frame → render continuo
         takeUntil(this.cancelStream$),
